@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+/bin/
+/dist/
 
 # Test binary, built with `go test -c`
 *.test
@@ -16,6 +18,8 @@
 coverage.*
 *.coverprofile
 profile.cov
+/coverage/
+*.prof
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -28,5 +32,25 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
+.idea/
 # .vscode/
+
+# Local PKI state and generated cryptographic material
+/pki/
+/certs/
+/private/
+*.key
+*.crt
+*.cer
+*.pem
+*.p12
+*.pfx
+*.der
+*.csr
+*.srl
+
+# Optional local agent installations
+/.agents/
+/.claude/
+
+.DS_Store
