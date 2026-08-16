@@ -1,0 +1,9 @@
+{
+  "rootDays": 3650,
+  "issuerDays": 1825,
+  "serverDays": 180,
+  "clientDays": 365,
+  "algorithm": "ecdsa",
+  "curve": "P-256",
+  "rsaBits": 3072
+}

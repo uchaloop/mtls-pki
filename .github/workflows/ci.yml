@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Go checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install Linux integration dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes openssl
+
+      - name: Check formatting
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l .)"
+          if [[ -n "$unformatted" ]]; then
+            printf 'unformatted Go files:\n%s\n' "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: Check module files
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Check modernization
+        run: go fix -diff ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run race tests
+        run: go test -race ./...
+
+      - name: Install and smoke-test command
+        run: |
+          go install ./cmd/mtls-pki
+          "$(go env GOPATH)/bin/mtls-pki$(go env GOEXE)" --version
+
+      - name: Run integration tests
+        if: runner.os != 'Windows'
+        run: make integration
+
+      - name: Test deterministic packaging
+        if: runner.os == 'Linux'
+        env:
+          SOURCE_DATE_EPOCH: "1700000000"
+        run: |
+          set -euo pipefail
+          output_one="$(mktemp -d)"
+          output_two="$(mktemp -d)"
+
+          python3 -m py_compile .github/scripts/package_release.py
+          python3 .github/scripts/package_release.py \
+            --binary /bin/echo \
+            --version 0.0.0-test \
+            --target linux_amd64 \
+            --format tar.gz \
+            --output-dir "$output_one"
+          python3 .github/scripts/package_release.py \
+            --binary /bin/echo \
+            --version 0.0.0-test \
+            --target linux_amd64 \
+            --format tar.gz \
+            --output-dir "$output_two"
+
+          cmp \
+            "$output_one/mtls-pki_0.0.0-test_linux_amd64.tar.gz" \
+            "$output_two/mtls-pki_0.0.0-test_linux_amd64.tar.gz"
+          tar -tzf "$output_one/mtls-pki_0.0.0-test_linux_amd64.tar.gz"
+
+      - name: Reject tracked PKI secrets
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          forbidden="$(git ls-files '*.key' '*.crt' '*.cer' '*.pem' '*.p12' '*.pfx' '*.der' '*.csr' '*.srl')"
+          if [[ -n "$forbidden" ]]; then
+            printf 'tracked PKI material is forbidden:\n%s\n' "$forbidden" >&2
+            exit 1
+          fi
+
+          if git grep -n -E -e '-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----'; then
+            echo 'private-key PEM material found in tracked files' >&2
+            exit 1
+          fi
+
+      - name: Check patch whitespace
+        if: runner.os == 'Linux'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git diff --check "$PR_BASE_SHA" "$PR_HEAD_SHA"
+          elif [[ "$PUSH_BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            git show --check --format=fuller "$PUSH_HEAD_SHA"
+          else
+            git diff --check "$PUSH_BEFORE_SHA" "$PUSH_HEAD_SHA"
+          fi
+
+  cross-compile:
+    name: Cross-platform build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - run: make cross
+
+  vulnerability-scan:
+    name: Vulnerability scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - uses: golang/govulncheck-action@v1
