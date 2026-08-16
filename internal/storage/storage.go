@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -91,18 +90,5 @@ func WriteAtomic(path string, data []byte, mode os.FileMode, replace bool) error
 		return e
 	}
 
-	// The directory is synced separately, otherwise the rename may not survive a power loss.
-	dir, e := os.Open(filepath.Dir(path))
-	if e != nil {
-		return e
-	}
-
-	syncErr := dir.Sync()
-	closeErr = dir.Close()
-
-	if syncErr != nil && !errors.Is(syncErr, syscall.EINVAL) {
-		return syncErr
-	}
-
-	return closeErr
+	return syncDirectory(filepath.Dir(path))
 }

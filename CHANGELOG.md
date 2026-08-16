@@ -2,21 +2,6 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
-
-### What's Changed
-
-* Add repository instructions for security-sensitive Codex changes
-* Add cross-platform CI, race and integration tests, vulnerability scanning and tracked-secret checks
-* Add deterministic multi-platform release archives and SHA-256 checksums
-* Normalize text files across platforms and expand local PKI artifact exclusions
-* Reject path-segment and oversized PKI, issuer and certificate names consistently across commands
-* Verify CRLs only against the issuer from a successfully verified certificate chain
-* Update `go-pkcs12` to the release containing the GO-2026-5052 fix
-* Require password protection for new Root and issuer keys unless unencrypted storage is explicitly allowed
-* Validate Kubernetes Secret and namespace names before rendering manifests
-* Report private keys and PKCS#12 files exposed through group or other filesystem permissions in `doctor`
-
 ## v0.1.0
 
 ### What's Changed
@@ -39,5 +24,14 @@ All notable changes to this project are documented in this file.
 * Add password sources for keys: environment variable, file, stdin and terminal prompt
 * Build the CLI on Cobra and require Go 1.26.6 for the ASN.1 recursion-depth security fix
 * Add unit, integration and CLI contract tests, fuzz targets for untrusted serialized input, and reproducible-friendly builds with embedded version metadata
-
-**Full Changelog**: https://github.com/uchaloop/mtls-pki/commits/v0.1.0
+* Add repository instructions for security-sensitive Codex changes
+* Add cross-platform CI, race and integration tests, vulnerability scanning and tracked-secret checks
+* Add deterministic multi-platform release archives and SHA-256 checksums
+* Normalize text files across platforms and expand local PKI artifact exclusions
+* Reject path-segment and oversized PKI, issuer and certificate names consistently across commands
+* Verify CRLs only against the issuer from a successfully verified certificate chain
+* Use the `go-pkcs12` release containing the GO-2026-5052 fix
+* Require password protection for new Root and issuer keys unless unencrypted storage is explicitly allowed
+* Validate Kubernetes Secret and namespace names before rendering manifests
+* Report private keys and PKCS#12 files exposed through group or other filesystem permissions in `doctor`
+* Preserve atomic file writes on Windows without attempting unsupported directory descriptor synchronization
